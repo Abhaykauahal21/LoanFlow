@@ -40,7 +40,7 @@ router.get('/dashboard-stats', auth, async (req, res) => {
         { 
           $match: { 
             user: userId,
-            status: 'Approved'
+            status: 'approved'
           }
         },
         {
@@ -75,17 +75,17 @@ router.get('/dashboard-stats', auth, async (req, res) => {
             totalAmount: { $sum: '$amount' },
             approved: {
               $sum: {
-                $cond: [{ $eq: ['$status', 'Approved'] }, 1, 0]
+                $cond: [{ $eq: ['$status', 'approved'] }, 1, 0]
               }
             },
             pending: {
               $sum: {
-                $cond: [{ $eq: ['$status', 'Pending'] }, 1, 0]
+                $cond: [{ $eq: ['$status', 'pending'] }, 1, 0]
               }
             },
             rejected: {
               $sum: {
-                $cond: [{ $eq: ['$status', 'Rejected'] }, 1, 0]
+                $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0]
               }
             }
           }
@@ -157,8 +157,8 @@ router.post('/apply', auth, upload.array('documents', 3), async (req, res) => {
       amount: Number(amount),
       tenureMonths: Number(tenureMonths),
       income: Number(income),
-      documents: req.files.map(file => `uploads/${file.filename}`),
-      status: 'Pending'
+      documents: req.files.map(file => file.filename),
+      status: 'pending'
     });
 
     await loan.save();

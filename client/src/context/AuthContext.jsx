@@ -1,5 +1,6 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
 import axios from '../api/axios';
+import { hasPermission, getRolePermissions, Permissions } from '../utils/permissions';
 
 const AuthContext = createContext(null);
 
@@ -7,8 +8,19 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [permissions, setPermissions] = useState([]);
 
   const clearError = () => setError(null);
+
+  // Update permissions when user changes
+  useEffect(() => {
+    if (user && user.role) {
+      const rolePermissions = getRolePermissions(user.role);
+      setPermissions(rolePermissions);
+    } else {
+      setPermissions([]);
+    }
+  }, [user]);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -121,8 +133,44 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Check if user has a specific permission
+  const checkPermission = useMemo(() => (permission) => {
+    if (!user || !user.role) return false;
+    return hasPermission(user.role, permission);
+  }, [user]);
+
+  // Check if user has any of the provided permissions
+  const hasAnyPermission = useMemo(() => (requiredPermissions) => {
+    if (!user || !user.role) return false;
+    return requiredPermissions.some(permission => hasPermission(user.role, permission));
+  }, [user]);
+
+  // Check if user has all of the provided permissions
+  const hasAllPermissions = useMemo(() => (requiredPermissions) => {
+    if (!user || !user.role) return false;
+    return requiredPermissions.every(permission => hasPermission(user.role, permission));
+  }, [user]);
+
+  const value = {
+    user,
+    login,
+    register,
+    logout,
+    loading,
+    error,
+    clearError,
+    updateProfile,
+    permissions,
+    checkPermission,
+    hasAnyPermission,
+    hasAllPermissions,
+    isAdmin: user?.role === 'admin',
+    isManager: user?.role === 'manager',
+    isUser: user?.role === 'user',
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading, error, clearError, updateProfile }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -135,5 +183,8 @@ export const useAuth = () => {
   }
   return context;
 };
+
+// Export permissions for easy access
+export { Permissions };
 
 export default AuthContext;

@@ -1,6 +1,10 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Provider } from 'react-redux';
+import { store } from './store';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import NotificationManager from './components/NotificationManager';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -10,11 +14,16 @@ import ApplyLoan from './pages/ApplyLoan';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </AuthProvider>
+    <ErrorBoundary>
+      <Provider store={store}>
+        <AuthProvider>
+          <Router>
+            <NotificationManager />
+            <AppContent />
+          </Router>
+        </AuthProvider>
+      </Provider>
+    </ErrorBoundary>
   );
 }
 
@@ -33,7 +42,7 @@ function AppContent() {
     <div className="min-h-screen bg-gray-50">
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Navigate to="/register" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         
@@ -43,9 +52,6 @@ function AppContent() {
         
         {/* Protected Admin Routes */}
         <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
-        
-        {/* Landing Page Route */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
         
         {/* Catch All Route */}
         <Route path="*" element={<Navigate to="/login" replace />} />
