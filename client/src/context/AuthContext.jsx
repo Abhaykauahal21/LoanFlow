@@ -31,7 +31,14 @@ export const AuthProvider = ({ children }) => {
       }
 
       try {
-        const response = await axios.get('/auth/user');
+        // First verify the API is available
+        await axios.get('/health');
+        
+        const response = await axios.get('/auth/user', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         setUser(response.data);
         setError(null);
       } catch (err) {
@@ -70,15 +77,59 @@ export const AuthProvider = ({ children }) => {
       clearError();
       validateInput({ email, password });
 
-      const response = await axios.post('/auth/login', { email, password });
-      const { token, user } = response.data;
+      // Add retry logic for network issues
+      const maxRetries = 2;
+      let lastError;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const response = await axios.post('/auth/login', { 
+            email: email.trim(), 
+            password 
+          });
+          
+          const { token, user } = response.data;
+          
+          if (!token || !user) {
+            throw new Error('Invalid server response - missing token or user data');
+          }
+          
+          localStorage.setItem('token', token);
+          // Normalize user object to ensure _id is available across the app
+          setUser({ ...user, _id: user._id || user.id });
+          return user;
+        } catch (err) {
+          lastError = err;
+          
+          // Only retry on network errors or 5xx
+          const status = err?.response?.status;
+          const isRetryable = !status || (status >= 500 && status < 600);
+          
+          if (!isRetryable || attempt === maxRetries) {
+            throw err;
+          }
+          
+          // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        }
+      }
       
-      localStorage.setItem('token', token);
-      setUser(user);
-      return user;
+      throw lastError;
     } catch (err) {
       console.error('Login error:', err);
-      const errorMessage = err.response?.data?.msg || err.message || 'Login failed';
+      
+      const errorResponse = err.response?.data;
+      let errorMessage;
+      
+      if (errorResponse?.fields) {
+        // Handle field-specific validation errors
+        errorMessage = Object.values(errorResponse.fields)
+          .filter(msg => msg)
+          .join(', ');
+      } else {
+        errorMessage = errorResponse?.msg || err.message || 'Login failed. Please check your connection and try again.';
+      }
+      
       setError(errorMessage);
       throw new Error(errorMessage);
     }
@@ -98,7 +149,8 @@ export const AuthProvider = ({ children }) => {
       
       const { token, user } = response.data;
       localStorage.setItem('token', token);
-      setUser(user);
+      // Normalize user object to ensure _id is available across the app
+      setUser({ ...user, _id: user._id || user.id });
       return user;
     } catch (err) {
       console.error('Registration error:', err);

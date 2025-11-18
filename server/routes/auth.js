@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 
 // Create default admin if not exists
@@ -13,7 +14,7 @@ const createDefaultAdmin = async () => {
       
       const admin = new User({
         name: 'Admin',
-        email: 'admin@example.com',
+        email: 'admin@example.com'.toLowerCase(),
         password: hashedPassword,
         role: 'admin'
       });
@@ -34,15 +35,40 @@ router.post('/register', async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
 
-    // Validate input
-    if (!name || !email || !password) {
-      return res.status(400).json({ msg: 'Please enter all required fields' });
+    // Enhanced input validation
+    if (!name?.trim() || !email?.trim() || !password?.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        msg: 'Please enter all required fields',
+        fields: {
+          name: !name?.trim() ? 'Name is required' : null,
+          email: !email?.trim() ? 'Email is required' : null,
+          password: !password?.trim() ? 'Password is required' : null
+        }
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        success: false,
+        msg: 'Please enter a valid email address'
+      });
+    }
+
+    // Validate password strength
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        msg: 'Password must be at least 6 characters long'
+      });
     }
 
     // Check if user exists
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: email.toLowerCase() });
     if (user) {
-      return res.status(400).json({ msg: 'User already exists' });
+      return res.status(400).json({ success: false, msg: 'User already exists' });
     }
 
     // Hash password
@@ -67,6 +93,7 @@ router.post('/register', async (req, res) => {
     );
 
     res.json({
+      success: true,
       token,
       user: {
         id: user._id,
@@ -76,27 +103,84 @@ router.post('/register', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
+    console.error('❌ Register error:', err);
+    res.status(500).json({
+      success: false,
+      msg: 'Server error during registration',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
 // Login
 router.post('/login', async (req, res) => {
   try {
+    console.log('👉 Login attempt for email:', req.body.email);
     const { email, password } = req.body;
 
-    // Check if user exists
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ msg: 'Invalid credentials' });
+    // Enhanced input validation
+    if (!email?.trim() || !password?.trim()) {
+      console.log('❌ Login validation failed: Missing fields');
+      return res.status(400).json({
+        success: false,
+        msg: 'Please enter all required fields',
+        fields: {
+          email: !email?.trim() ? 'Email is required' : null,
+          password: !password?.trim() ? 'Password is required' : null
+        }
+      });
     }
 
-    // Validate password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ msg: 'Invalid credentials' });
+    // Check MongoDB connection first
+    if (mongoose.connection.readyState !== 1) {
+      console.error('❌ MongoDB not connected. Current state:', mongoose.connection.readyState);
+      return res.status(500).json({
+        success: false,
+        msg: 'Database connection error. Please try again.'
+      });
     }
+
+    // Check if user exists (using index)
+    const user = await User.findOne({ email: email.toLowerCase() })
+      .select('+password')  // Explicitly include password field
+      .catch(err => {
+        console.error('❌ Database query error:', err);
+        return null;
+      });
+
+    if (!user) {
+      console.log('❌ Login failed: User not found for email:', email);
+      return res.status(401).json({ 
+        success: false,
+        msg: 'Invalid email or password' 
+      });
+    }
+
+    // Validate password exists in user document
+    if (!user.password) {
+      console.error('❌ User found but password field is missing for email:', email);
+      return res.status(500).json({
+        success: false,
+        msg: 'Account configuration error. Please contact support.'
+      });
+    }
+
+    // Validate password with consistent timing
+    const isMatch = await bcrypt.compare(password, user.password)
+      .catch(err => {
+        console.error('❌ Password comparison error:', err);
+        return false;
+      });
+
+    if (!isMatch) {
+      console.log('❌ Login failed: Invalid password for email:', email);
+      return res.status(401).json({ 
+        success: false,
+        msg: 'Invalid email or password'
+      });
+    }
+
+    console.log('✅ Login successful for email:', email);
 
     // Create token
     const token = jwt.sign(
@@ -106,6 +190,7 @@ router.post('/login', async (req, res) => {
     );
 
     res.json({
+      success: true,
       token,
       user: {
         id: user._id,
@@ -115,8 +200,12 @@ router.post('/login', async (req, res) => {
       }
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
+    console.error('❌ Login error:', err);
+    res.status(500).json({
+      success: false,
+      msg: 'Server error during login',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
@@ -126,8 +215,12 @@ router.get('/user', require('../middleware/auth').auth, async (req, res) => {
     const user = await User.findById(req.user.id).select('-password');
     res.json(user);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
+    console.error('❌ Get user error:', err);
+    res.status(500).json({
+      success: false,
+      msg: 'Server error fetching user',
+      error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 

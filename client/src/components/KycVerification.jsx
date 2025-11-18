@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { updateKycStatus } from '../store/slices/usersSlice';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 const KycVerification = ({ user }) => {
   const dispatch = useDispatch();

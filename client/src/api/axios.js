@@ -4,8 +4,10 @@ import { showNotification } from '../store/slices/notificationsSlice';
 import { ErrorTypes, getErrorType, getErrorMessage } from '../utils/errorHandling';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5004/api',
-  timeout: 10000,
+  // Use relative path so Vite proxy (client/vite.config.js) forwards to backend
+  baseURL: '/api',
+  timeout: 15000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json'
   }
@@ -90,28 +92,31 @@ api.interceptors.response.use(
   }
 );
 
-// Add request retry functionality
+// Add request retry functionality (simple retry for network/5xx errors)
 api.interceptors.response.use(undefined, async error => {
   const config = error.config;
 
-  // Only retry on network errors or 5xx server errors
-  if (
-    !config || 
-    !config.retry || 
-    config.retry >= 3 ||
-    (error.response && error.response.status < 500)
-  ) {
+  if (!config) {
     return Promise.reject(error);
   }
 
-  // Increase retry count
-  config.retry = (config.retry || 0) + 1;
+  // Initialize retry tracking
+  config.__retryCount = config.__retryCount || 0;
+  const maxRetries = config.__maxRetries || 2;
 
-  // Delay each retry attempt
-  const delay = config.retry * 1000;
+  const status = error.response?.status;
+  const isRetryable = !status || (status >= 500 && status < 600);
+
+  if (!isRetryable || config.__retryCount >= maxRetries) {
+    return Promise.reject(error);
+  }
+
+  config.__retryCount += 1;
+
+  // Exponential backoff
+  const delay = Math.pow(2, config.__retryCount) * 500;
   await new Promise(resolve => setTimeout(resolve, delay));
 
-  // Retry the request
   return api(config);
 });
 

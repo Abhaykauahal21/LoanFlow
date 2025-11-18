@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
+import { toast, Toaster } from 'react-hot-toast';
 import { useSelector, useDispatch } from 'react-redux';
 import { removeNotification } from '../store/slices/notificationsSlice';
 

@@ -58,6 +58,7 @@ export const getErrorMessage = (error) => {
   // Get the most specific error message available
   return (
     error?.response?.data?.message ||
+    error?.response?.data?.msg ||
     error?.response?.data?.error ||
     error?.message ||
     defaultMessage

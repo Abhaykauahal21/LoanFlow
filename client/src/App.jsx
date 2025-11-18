@@ -1,7 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Provider } from 'react-redux';
-import { store } from './store';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import NotificationManager from './components/NotificationManager';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -10,19 +8,15 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import UserDashboard from './pages/UserDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+// Landing page removed; default route will redirect to login
 import ApplyLoan from './pages/ApplyLoan';
+import LoanEMIDetailsPage from './pages/LoanEMIDetailsPage';
 
-function App() {
+function App() {  
   return (
     <ErrorBoundary>
-      <Provider store={store}>
-        <AuthProvider>
-          <Router>
-            <NotificationManager />
-            <AppContent />
-          </Router>
-        </AuthProvider>
-      </Provider>
+      <NotificationManager />
+      <AppContent />
     </ErrorBoundary>
   );
 }
@@ -42,19 +36,20 @@ function AppContent() {
     <div className="min-h-screen bg-gray-50">
       <Routes>
         {/* Public Routes */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+  <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         
         {/* Protected User Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><UserDashboard /></ProtectedRoute>} />
         <Route path="/apply" element={<ProtectedRoute><ApplyLoan /></ProtectedRoute>} />
+        <Route path="/loan-emi/:loanId" element={<ProtectedRoute><LoanEMIDetailsPage /></ProtectedRoute>} />
         
         {/* Protected Admin Routes */}
         <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
         
-        {/* Catch All Route */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+  {/* Catch All Route */}
+  <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </div>
   );
