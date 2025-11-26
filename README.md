@@ -50,7 +50,9 @@
 - **TailwindCSS** for styling
 - **React Router** for navigation
 - **Axios** for API requests
-- **Context API** for state management
+- **Redux Toolkit** for app state (notifications, loans, users, payments, settings)
+- **react-hot-toast** for notifications
+- **Recharts** for dashboards/analytics
 
 ### Backend
 - **Node.js** with Express
@@ -58,6 +60,11 @@
 - **JWT** for authentication
 - **Multer** for file uploads
 - **CORS** enabled
+
+### Data Storage
+- Application data stored in **MongoDB** (see `server/config/db.js`)
+- Uploaded documents stored on disk in `server/uploads/` and served via `/uploads`
+- Client stores JWT token in `localStorage` and sends it via `Authorization: Bearer <token>` header
 
 ## 📦 Installation
 
@@ -75,8 +82,8 @@ npm install
 
 Create a .env file:
 ```env
-PORT=5004
-MONGODB_URI=your_mongodb_uri
+PORT=5000
+MONGODB_URI=mongodb://localhost:27017/loan_app
 JWT_SECRET=your_secret_key
 ```
 
@@ -86,10 +93,7 @@ cd ../client
 npm install
 ```
 
-Create a .env file:
-```env
-VITE_API_URL=http://localhost:5004/api
-```
+No client `.env` required for development. Vite dev server proxies `/api` to the backend automatically per `client/vite.config.js`.
 
 ## 🚀 Running the Application
 
@@ -106,8 +110,12 @@ npm run dev
 ```
 
 The application will be available at:
-- Frontend: http://localhost:3002
-- Backend: http://localhost:5004
+- Frontend: `http://localhost:3003` (Vite dev server)
+- Backend: `http://localhost:5000` (Express server)
+
+Notes:
+- Vite dev server proxies requests starting with `/api` to `http://localhost:${SERVER_PORT || PORT || 5000}`.
+- Set `PORT=5000` in your server `.env` to match the proxy default.
 
 ## 📡 API Endpoints
 
@@ -120,9 +128,11 @@ The application will be available at:
 ### Loans
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/loans/my-loans` | Get user's loans |
+| GET | `/api/loans/my` | Get user's loans |
+| GET | `/api/loans/my-loans` | Get user's loans (legacy) |
 | GET | `/api/loans/dashboard-stats` | Get dashboard statistics |
-| POST | `/api/loans/apply` | Apply for a loan |
+| GET | `/api/loans/:id` | Get specific loan (authorization enforced) |
+| POST | `/api/loans/apply` | Apply for a loan (supports document upload) |
 
 ### Admin
 | Method | Endpoint | Description |
@@ -135,10 +145,9 @@ The application will be available at:
 
 - JWT authentication
 - Password hashing
-- Protected routes
-- File upload validation
-- Request rate limiting
-- Input sanitization
+- Protected routes with role/permission checks
+- File upload validation and size limits
+- Input validation and basic sanitization
 
 ## 🗂️ Project Structure
 
@@ -148,7 +157,10 @@ LoanFlow/
 │   ├── src/
 │   │   ├── api/            # Axios configuration
 │   │   ├── components/     # Reusable components
-│   │   ├── context/        # Auth context
+│   │   ├── context/        # Auth context (session & logout)
+│   │   ├── store/          # Redux Toolkit slices & store
+│   │   ├── utils/          # Error handling, EMI calculator, permissions
+│   │   ├── pages/          # Application pages (User/Admin dashboards, Login, Register, Apply)
 │   │   └── pages/         # Application pages
 │   └── vite.config.js     # Vite configuration
 └── server/                # Backend Node.js application
@@ -157,6 +169,13 @@ LoanFlow/
     ├── models/          # MongoDB models
     ├── routes/          # API routes
     └── uploads/         # User uploaded files
+
+## 🧭 How It Works
+- Authentication: Users register/login; server issues a JWT; client saves the token in `localStorage` and attaches it to requests via an Axios interceptor (`client/src/api/axios.js`).
+- Authorization: Middleware checks roles/permissions; protected pages use `ProtectedRoute` on the client.
+- State Management: Redux Toolkit manages slices for notifications, loans, payments, users, and settings.
+- Notifications: Server/API errors are surfaced through a central notification system; toast popups are suppressed for authentication/authorization errors in the user portal.
+- Analytics: Dashboard aggregates loan counts and amounts via MongoDB aggregations and renders charts with Recharts.
 ```
 
 ## 🔧 Environment Setup
