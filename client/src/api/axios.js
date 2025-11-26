@@ -38,11 +38,13 @@ api.interceptors.response.use(
     const errorType = getErrorType(error);
     const errorMessage = getErrorMessage(error);
 
-    // Dispatch notification for error feedback
-    store.dispatch(showNotification({
-      type: 'error',
-      message: errorMessage
-    }));
+    // Only show toast notifications for non-auth errors
+    if (errorType !== ErrorTypes.AUTHENTICATION_ERROR && errorType !== ErrorTypes.AUTHORIZATION_ERROR) {
+      store.dispatch(showNotification({
+        type: 'error',
+        message: errorMessage
+      }));
+    }
 
     // Handle specific error types
     switch (errorType) {

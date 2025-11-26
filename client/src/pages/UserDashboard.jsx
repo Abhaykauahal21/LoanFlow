@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import LoanCard from '../components/LoanCard';
 import axios from '../api/axios';
-import { toast } from 'react-hot-toast';
 import { FaFileUpload, FaMoneyBillWave, FaChartLine, FaFileInvoiceDollar, FaBell, FaCreditCard, FaShieldAlt, FaPiggyBank } from 'react-icons/fa';
 
 // Lazy load components
@@ -206,7 +205,7 @@ const UserDashboard = () => {
           amounts,
           monthlyStats: statsData.monthlyStats || []
         });
-      } else {
+  } else {
         const calculatedStats = {
           totalLoans: loansData.length,
           activeLoans: loansData.filter(loan => loan.status === 'Approved').length,
@@ -231,13 +230,12 @@ const UserDashboard = () => {
           monthlyStats: []
         });
       }
-    } catch (err) {
-      console.error('Dashboard fetch error:', err);
-      setError(err.response?.data?.msg || 'Failed to fetch dashboard data');
-      toast.error('Failed to load dashboard data');
-    } finally {
-      setLoading(false);
-    }
+  } catch (err) {
+    console.error('Dashboard fetch error:', err);
+    setError(err.response?.data?.msg || 'Failed to fetch dashboard data');
+  } finally {
+    setLoading(false);
+  }
   }, [user]);
 
   useEffect(() => {
