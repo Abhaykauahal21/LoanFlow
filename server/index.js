@@ -18,8 +18,30 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Enhanced CORS configuration
+const allowedOrigins = ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:3003'];
+
+// Add production frontend URL if provided
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:3003'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // In development, allow all origins
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    // Check if origin is in allowed list
+    if (allowedOrigins.some(allowed => origin === allowed || origin.startsWith(allowed))) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -32,13 +54,48 @@ app.use('/uploads', express.static('uploads')); // serve files in dev
 
 connectDB();
 
+// Root route
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    message: 'Loan App API Server',
+    status: 'running',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// API routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/loans', require('./routes/loan'));
 app.use('/api/payments', require('./routes/payment'));
 app.use('/api/admin', require('./routes/admin'));
 
 const PORT = process.env.PORT || 5006;
-// Global error handler
+
+// 404 handler for undefined routes (must be before error handler)
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Route ${req.method} ${req.path} not found`,
+    availableEndpoints: [
+      'GET /',
+      'GET /api/health',
+      'POST /api/auth/register',
+      'POST /api/auth/login',
+      'GET /api/loans/my',
+      'GET /api/loans/dashboard-stats',
+      'POST /api/loans/apply',
+      'GET /api/admin/loans',
+      'GET /api/admin/stats'
+    ]
+  });
+});
+
+// Global error handler (must be last)
 app.use((err, req, res, next) => {
   console.error('Global error:', err);
   const statusCode = err.statusCode || 500;
@@ -48,11 +105,6 @@ app.use((err, req, res, next) => {
     message,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
-});
-
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 const server = app.listen(PORT, () => {
